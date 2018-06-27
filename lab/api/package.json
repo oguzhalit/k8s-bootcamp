@@ -5,7 +5,6 @@
   "main": "src/App.js",
   "scripts": {
     "preinstall": "npm install -g typescript ts-node",
-    "migrate": "flyway -c conf/flyway.ts migrate",
     "build": "tsc",
     "dev": "ts-node ./src/Server.ts",
     "start": "nodemon ./build/Server.js",
