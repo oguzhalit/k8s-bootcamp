@@ -15,6 +15,8 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 	- [Basic Project](#basic-project)
 		- [Tools](#tools)
 		- [How to use it](#how-to-use-it)
+			- [Running API Project](#running-api-project)
+			- [Running WEB Project](#running-web-project)
 	- [From local to cloud](#from-local-to-cloud)
 		- [Generating Dockerfile](#generating-dockerfile)
 		- [Grouping with compose](#grouping-with-compose)
@@ -77,6 +79,35 @@ If you have any previous knowledge of any of the given tool, it will help a lot 
 You will find all the releases unde the tag of the project. Those releases are intended to be used as a starting point for this project. You will receive a clean environment, containing just the application itself (both API and WEB) and you will be able to run them with the commands present at `package.json` file of both projects. You can use a `.env` file to set some of the variables of the API app. Every new release will be an incremental step to our goal of taking this application to the cloud. When required, we will point to the tag on the code that you can get to start at that point, and we expect you to finish that topic at the start of the next tag.
 
 A good starting point for you will be our [first tag](https://github.com/paulushcgcj/daitan-k8s-bootcamp/releases/tag/v1.0), so get it and start working on it.
+
+#### Running API Project
+
+To run the API, you will need a MongoDB instance running. I recommend that you use [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/lp/general) as you can use it with a free instance or any other cloud provided mongodb instance, or you can use a [dockerized mongodb](https://hub.docker.com/_/mongo/).
+
+If you, like miself, prefeer to use a dockerized mongodb instance, so I will execute the following command:
+
+```bash
+docker run --name k8bs-bootcamp-db -p 27017:27017 -d mongo
+```
+
+This will download if you already don't have mongodb image on your docker, and start it for you, exposing the default mongodb port to you. Now create a `.env` file in your [api folder](lab/api), with the following:
+
+```configuration
+PORT=8090 #the exposed port, use the one that suits you better
+MONGO=<YOUR MONGODB CONNECTION STRING>
+```
+
+Replace the placeholder with your mongodb ip. If you use atlas, get the connection info from atlas, if you use Google Cloud or Azure, get the connection there as well, but if you, like miself prefer to go with a local dockerized mongo, point it to your localhost or 127.0.0.1.
+
+Just a quick note here, if you use [Docker Toolbox](https://docs.docker.com/toolbox/), due to OS limitations, you have to point to the VM ip address. Usually it will be 192.168.99.100, but check your instance IP by running `docker-machine env`.
+
+Once we have it done, let's check nodejs. Make sure you have nodejs and npm installed, and inside API folder run `npm i` to install all the dependencies, and them run `npm run dev` to execute the projecton dev environment.
+
+Awesome now you are ready to use the API.
+
+#### Running WEB Project
+
+Now, we need to boot up our web interface, so we can do some of the steps that we did in API, go to [web folder](lab/web) and install the dependencies with `npm i`. Now we have everything in place, make sure our API is up and running and edit the `packages.json` file and change the `proxy` property to point to your API port, the same one you configured on the previous step. Once is done, run `yarn start` or `npm start` to execute the project and a new windows will pop-up with the project.
 
 ## From local to cloud
 
