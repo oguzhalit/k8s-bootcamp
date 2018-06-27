@@ -14,6 +14,7 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 	- [Table of Contents](#table-of-contents)
 	- [Basic Project](#basic-project)
 		- [Tools](#tools)
+		- [How to use it](#how-to-use-it)
 	- [From local to cloud](#from-local-to-cloud)
 		- [Generating Dockerfile](#generating-dockerfile)
 		- [Grouping with compose](#grouping-with-compose)
@@ -36,6 +37,7 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 		- [Deploying to Heroku](#deploying-to-heroku)
 		- [Deploying to Kubernetes](#deploying-to-kubernetes)
 	- [Something Missing](#something-missing)
+		- [Know issues](#know-issues)
 
 ## Basic Project
 
@@ -69,6 +71,12 @@ If you have any previous knowledge of any of the given tool, it will help a lot 
 - [Heroku](https://www.heroku.com/)
 - [Microsoft Azure](https://azure.microsoft.com)
 - [Google Cloud Platform](https://cloud.google.com/)
+
+### How to use it
+
+You will find all the releases unde the tag of the project. Those releases are intended to be used as a starting point for this project. You will receive a clean environment, containing just the application itself (both API and WEB) and you will be able to run them with the commands present at `package.json` file of both projects. You can use a `.env` file to set some of the variables of the API app. Every new release will be an incremental step to our goal of taking this application to the cloud. When required, we will point to the tag on the code that you can get to start at that point, and we expect you to finish that topic at the start of the next tag.
+
+A good starting point for you will be our [first tag](https://github.com/paulushcgcj/daitan-k8s-bootcamp/releases/tag/v1.0), so get it and start working on it.
 
 ## From local to cloud
 
@@ -115,3 +123,8 @@ If you have any previous knowledge of any of the given tool, it will help a lot 
 ## Something Missing
 
 If you have ideas for more “How To” or fixes for some errors found in here, [let us know](https://github.com/paulushcgcj/daitan-k8s-bootcamp/issues) or [contribute some!](https://github.com/paulushcgcj/daitan-k8s-bootcamp/edit/master/README.md)
+
+### Know issues
+
+- Sometimes, npm just don't work as expected. It can be due to some network issues, or path issues (is know that windows environments contains a limitation on the amount of characters used) so try to keep the project under a directory within a small path if you, like miself intent to use it on windows environment.
+- MongoDB could be a real pain to install in certain environments, so I recommend that you use [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/lp/general) as you can use it with a free instance or any other cloud provided mongodb instance, or you can use a [dockerized mongodb](https://hub.docker.com/_/mongo/).
