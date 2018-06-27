@@ -87,7 +87,7 @@ To run the API, you will need a MongoDB instance running. I recommend that you u
 If you, like miself, prefeer to use a dockerized mongodb instance, so I will execute the following command:
 
 ```bash
-docker run --name k8bs-bootcamp-db -p 27017:27017 -d mongo
+docker run --name k8s-bootcamp-db -p 27017:27017 -d mongo
 ```
 
 This will download if you already don't have mongodb image on your docker, and start it for you, exposing the default mongodb port to you. Now create a `.env` file in your [api folder](lab/api), with the following:
@@ -97,9 +97,9 @@ PORT=8090 #the exposed port, use the one that suits you better
 MONGO=<YOUR MONGODB CONNECTION STRING>
 ```
 
-Replace the placeholder with your mongodb ip. If you use atlas, get the connection info from atlas, if you use Google Cloud or Azure, get the connection there as well, but if you, like miself prefer to go with a local dockerized mongo, point it to your localhost or 127.0.0.1.
+Replace the placeholder with your mongodb ip. If you use atlas, get the connection info from atlas, if you use Google Cloud or Azure, get the connection there as well, but if you, like miself prefer to go with a local dockerized mongo, point it to your `localhost` or `127.0.0.1`.
 
-Just a quick note here, if you use [Docker Toolbox](https://docs.docker.com/toolbox/), due to OS limitations, you have to point to the VM ip address. Usually it will be 192.168.99.100, but check your instance IP by running `docker-machine env`.
+Just a quick note here, if you use [Docker Toolbox](https://docs.docker.com/toolbox/), due to OS limitations, you have to point to the VM ip address. Usually it will be `192.168.99.100`, but check your instance IP by running `docker-machine env`.
 
 Once we have it done, let's check nodejs. Make sure you have nodejs and npm installed, and inside API folder run `npm i` to install all the dependencies, and them run `npm run dev` to execute the projecton dev environment.
 
