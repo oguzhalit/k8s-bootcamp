@@ -19,6 +19,9 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 			- [Running WEB Project](#running-web-project)
 	- [From local to cloud](#from-local-to-cloud)
 		- [Generating Dockerfile](#generating-dockerfile)
+			- [Docker it: API](#docker-it-api)
+			- [Docker it: WEB](#docker-it-web)
+			- [Glue it up](#glue-it-up)
 		- [Grouping with compose](#grouping-with-compose)
 		- [Pushing to Docker Registry](#pushing-to-docker-registry)
 		- [Kubernetes Interactive Deploy](#kubernetes-interactive-deploy)
@@ -111,7 +114,171 @@ Now, we need to boot up our web interface, so we can do some of the steps that w
 
 ## From local to cloud
 
+This is the first class, the one where we will be packing our application inside docker and them sending it to a kubernetes cluster.
+
 ### Generating Dockerfile
+
+The first step is trying to understand what we have, and what is our current dependencies. Let's start with the API.
+
+#### Docker it: API
+
+Our API depends on the MongoDB, but, as mentioned during the start, we have mongoDB in docker, so we just need to start it using docker and point our image to it. If you don't remember how is done, is like this:
+
+```bash
+docker run --name k8s-bootcamp-db -p 27017:27017 -d mongo
+```
+
+Once we have our mongo instance up and running, we can now proceed with packing our API. We need to understand what we need from our API as well before we begin, and as a simple app, we only need to expose the API HTTP port right now. The way docker works is by keeping everything inside it's own world, not exposing anything, so we need to export the port to the outside world.
+
+Let's create a file called `Dockerfile` in our API folder. This file will be then used by docker to generate our pack.
+
+```dockerfile
+FROM node:8
+LABEL mantainer="Paulo Gomes da Cruz Junior <paulushc@gmail.com>"
+
+#Set the workdir folder
+WORKDIR /app
+#Copy the required content of the api folder
+COPY . /app
+#Install dependencies
+RUN npm i
+#Build the project
+RUN npm run build
+#Expose the port 3000
+EXPOSE 3000
+#RUN THE APP
+cmd npm start
+```
+
+Now, to build it, we have to run the docker command to build it. Don't worry we will pass through all parameters one by one. So inside your APi folder, where you created your ´Dockerfile`, run:
+
+```shell
+docker build --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` --build-arg VCS_REF=`git rev-parse --short HEAD` --build-arg IMAGE_TAG_REF=v1 -t k8s-bootcamp/api .
+```
+
+It can take some time, specially if you don't already have this image in your local docker. After it finishes, check the size of the image, and you will see how big it is, full of non used stuff. While it build, let's focus on what each parameter means:
+
+- `BUILD_DATE` -> Set the date of the build while we inspect the image.
+- `VCS_REF` -> Set the commit ID of the code that generated the image, good to backtrack what we've done.
+- `IMAGE_TAG_REF` -> It serve as a tag to mark the version of the image
+
+```shell
+$ docker images k8s-bootcamp/api
+REPOSITORY          TAG                 IMAGE ID            CREATED              SIZE
+k8s-bootcamp/api    latest              37e113effb09        About a minute ago   768MB
+```
+
+Hmm, 768 MB, that's waaaay too big for us to afford, specially in a so simple application like this one. We can certainly reduce the size of our image, and this will also reduce the time it takes for us to download it in our cluster or even in another computer. Lets change the `Dockerfile` again, to use a smaller version, based on Linux Alpine, by changing just the from line.
+
+```dockerfile
+FROM node:8-alpine
+LABEL mantainer="Paulo Gomes da Cruz Junior <paulushc@gmail.com>"
+
+#Set the workdir folder
+WORKDIR /app
+#Copy the required content of the api folder
+COPY . /app
+#Install dependencies
+RUN npm i
+#Build the project
+RUN npm run build
+#Expose the port 3000
+EXPOSE 3000
+#RUN THE APP
+cmd npm start
+```
+
+Again, let's build it with the same command. If you forgot what command is:
+
+```shell
+docker build --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` --build-arg VCS_REF=`git rev-parse --short HEAD` --build-arg IMAGE_TAG_REF=v1 -t k8s-bootcamp/api .
+```
+
+Now let's check the new size of our image.
+
+```shell
+$ docker images k8s-bootcamp/api
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+k8s-bootcamp/api    latest              647fb47486a3        12 minutes ago      163MB
+```
+
+Wow we squeeched to less than 200 MB, that's a lot. Remember, this will be the size of the image we will be using, so smaller means better and faster load time. Now, we will try to glue our node with our API. First let's stop the existing mongo instance, so we can boot up another one with a small trick.
+
+#### Docker it: WEB
+
+Ok, once we have our API in a dockerized version, let's now focus on our web app. We can reuse a lot of things we used in our API to build the WEB layer, so let's redo some of those steps. create a file called `Dockerfile` in our WEB folder too.
+
+```dockerfile
+FROM node:8-alpine as build
+LABEL mantainer="Paulo Gomes da Cruz Junior <paulushc@gmail.com>"
+
+#Set the workdir folder
+WORKDIR /app
+#Copy the required content of the api folder
+COPY . /app
+#Install dependencies
+RUN npm i
+#Build the project
+RUN npm run build
+
+FROM node:8-alpine
+LABEL mantainer="Paulo Gomes da Cruz Junior <paulushc@gmail.com>"
+#Set the workdir folder
+WORKDIR /app
+#Copy from previous build
+COPY --from=build /app/build /app
+#We install globally serve to "serve" our files
+RUN npm install -g serve
+#Expose the port 3000
+EXPOSE 5000
+#RUN THE APP
+CMD serve -s .
+```
+
+Again, let's build it with the same command but change the name of the image. Now, you're probably thinking why I'm exposing the same port on both applications, and it's simple. This is an internal only port, when we expose this por to the external world, we will be routing it to another port.
+
+```shell
+docker build --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` --build-arg VCS_REF=`git rev-parse --short HEAD` --build-arg IMAGE_TAG_REF=v1 -t k8s-bootcamp/web .
+```
+
+Now let's check the new size of our image.
+
+```shell
+$ docker images k8s-bootcamp/web
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+k8s-bootcamp/web    latest              303894ef097a        48 seconds ago      78.4MB
+```
+
+We managed to achieve a smaller image now, because we changed the way we made our image.
+
+#### Glue it up
+
+Ok, now we have everything we need to put it all together. Let's recap some things. We created a docker image for our APi, and one for our WEB layer, now it's time to make it work together. As docker isolate every image running on it's own world, we have to make them talk to each other, but not only talk, we have to point each image to each other by setting some environment variables.
+
+Create network
+
+```shell
+docker network create --subnet=199.18.0.0/16 k8s-bootcamp-nw
+```
+
+Start mongo
+
+```shell
+docker run --name k8s-bootcamp-db --net k8s-bootcamp-nw --ip 199.18.0.10 -p 27017:27017 -d mongo
+```
+
+Start API
+
+```shell
+docker run --name k8s-bootcamp-api --net k8s-bootcamp-nw --ip 199.18.0.11 -p3000:3000 -e MONGO=199.18.0.10 -d k8s-bootcamp/api
+```
+
+```shell
+docker run --name k8s-bootcamp-web --net k8s-bootcamp-nw --ip 199.18.0.12 -p 5000:5000 -e PUBLIC_URL=http://199.18.0.11:3000 -d k8s-bootcamp/web
+docker run --name k8s-bootcamp-web --net k8s-bootcamp-nw --ip 199.18.0.12 -p 5000:5000 -e PUBLIC_URL=http://199.18.0.11:3000 k8s-bootcamp/web
+```
+
+Test it
 
 ### Grouping with compose
 

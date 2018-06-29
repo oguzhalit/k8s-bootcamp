@@ -3,11 +3,12 @@ import { expect } from 'chai';
 import * as mongoose from "mongoose";
 import { CompanySchema } from '../Models/CompanyModel';
 import * as request from 'supertest';
-import { server } from "../server";
+import * as app from "../App";
 import { CompanyController } from '../Controllers/CompanyController';
 import { Request, Response } from 'express';
 
 const Company = mongoose.model('Company', CompanySchema);
+const server = app.default;
 
 describe('Company Management', () => {
 

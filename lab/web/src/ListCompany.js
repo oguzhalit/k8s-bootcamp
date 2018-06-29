@@ -3,6 +3,7 @@ import { Table, ButtonGroup, Button,Modal } from 'react-bootstrap';
 import * as routes from './routes';
 import deleteIcon from './rubbish-bin.svg';
 import editIcon from './pencil-edit-button.svg';
+import * as config from './config';
 
 export default class ListCompany extends Component{
 	constructor(props) {
@@ -12,7 +13,7 @@ export default class ListCompany extends Component{
 		this.deleteCompany = this.deleteCompany.bind(this);
 		this.handleShow = this.handleShow.bind(this);
 		this.handleClose = this.handleClose.bind(this);
-		
+
 		this.state = {
 			companies: [],
 			show: false,
@@ -21,7 +22,8 @@ export default class ListCompany extends Component{
 	}
 
 	componentDidMount() {
-		fetch('/api/company')
+		console.log('Public URL IS ON ', config.default.PUBLIC_URL);
+		fetch(`${config.default.PUBLIC_URL}/api/company`)
 			.then(response => response.json())
 			.then(response => this.setState({ companies:response }))
 			.catch(err => console.log('Error', err));
@@ -33,17 +35,17 @@ export default class ListCompany extends Component{
 
 	deleteCompany(ev) {
 		const removedTarget = ev.target.id;
-		fetch(`/api/company/${ev.target.id}`, {
+		fetch(`${config.default.PUBLIC_URL}/api/company/${ev.target.id}`, {
 			method: 'DELETE',
 			headers: {
 				'Accept': 'application/json',
 				'Content-Type': 'application/json',
 			}
 		})
-			.then(() => {				
-				var array = this.state.companies;				
-				var _company = array.find((x) => x._id === removedTarget);				
-				var index = array.indexOf(_company);				
+			.then(() => {
+				var array = this.state.companies;
+				var _company = array.find((x) => x._id === removedTarget);
+				var index = array.indexOf(_company);
 				array.splice(index, 1);
 				this.setState({ companies: array,show:true,company:_company});
 

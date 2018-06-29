@@ -1,0 +1,1 @@
+export default { PUBLIC_URL: process.env.NODE_ENV === 'production' ? 'http://company-api' : '' }

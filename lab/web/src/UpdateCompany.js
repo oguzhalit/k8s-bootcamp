@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { FormGroup, ControlLabel, FormControl, HelpBlock, Button } from 'react-bootstrap';
 import * as routes from './routes';
+import * as config from './config';
 
 const FieldGroup = ({ id, label, help, ...props }) => {
 	return (
@@ -31,7 +32,7 @@ export default class UpdateCompany extends Component {
 	}
 	componentDidMount() {
 		const { match: { params } } = this.props;
-		fetch(`/api/company/${params.id}`)
+		fetch(`${config.default.PUBLIC_URL}/api/company/${params.id}`)
 			.then(response => response.json())
 			.then(response => this.setState(response,() => console.log('State', this.state)))
 			.catch(err => console.log('Error',err));
@@ -47,7 +48,7 @@ export default class UpdateCompany extends Component {
 
 	addCompanyToAPI() {
 		const { match: { params } } = this.props;
-		fetch(`/api/company/${params.id}`, {
+		fetch(`${config.default.PUBLIC_URL}/api/company/${params.id}`, {
 			method: 'PUT',
 			headers: {
 				'Accept': 'application/json',
