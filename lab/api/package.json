@@ -22,7 +22,7 @@
   "build": "tsc",
   "dev": "cross-env NODE_ENV=dev ts-node ./src/Server.ts",
   "start": "cross-env NODE_ENV=production nodemon ./build/src/Server.js",
-  "prod": "NODE_ENV=production nodemon ./build/src/Server.js",
+  "prod": "cross-env NODE_ENV=production nodemon ./build/src/Server.js",
   "test": "cross-env NODE_ENV=testing mocha -r ts-node/register ./src/Tests/*.ts --timeout 5000 --exit",
   "coverage": "cross-env NODE_ENV=testing nyc --reporter=html --reporter=text --reporter=text-lcov mocha -r ts-node/register ./src/Tests/*.ts --timeout 5000 --exit"
  },

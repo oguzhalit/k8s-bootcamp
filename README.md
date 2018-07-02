@@ -221,18 +221,17 @@ RUN npm i
 #Build the project
 RUN npm run build
 
-FROM node:8-alpine
+FROM nginx:alpine
 LABEL mantainer="Paulo Gomes da Cruz Junior <paulushc@gmail.com>"
-#Set the workdir folder
-WORKDIR /app
 #Copy from previous build
-COPY --from=build /app/build /app
-#We install globally serve to "serve" our files
-RUN npm install -g serve
-#Expose the port 3000
-EXPOSE 5000
-#RUN THE APP
-CMD serve -s .
+COPY --from=build /app/build /usr/share/nginx/html
+COPY localhost.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+STOPSIGNAL SIGTERM
+
+CMD ["nginx", "-g", "daemon off;"]
 ```
 
 Again, let's build it with the same command but change the name of the image. Now, you're probably thinking why I'm exposing the same port on both applications, and it's simple. This is an internal only port, when we expose this por to the external world, we will be routing it to another port.
@@ -246,41 +245,73 @@ Now let's check the new size of our image.
 ```shell
 $ docker images k8s-bootcamp/web
 REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
-k8s-bootcamp/web    latest              303894ef097a        48 seconds ago      78.4MB
+k8s-bootcamp/web    latest              290b78caefef        4 minutes ago       21MB
 ```
 
-We managed to achieve a smaller image now, because we changed the way we made our image.
+We managed to achieve a smaller image now, only 21mb, because we changed the way we made our image. We first build our image using the same image as before, but after we built the image, we then build a final one, using nginx, and we pass just the result of our build to nginx. Awesome, don't you think?
 
 #### Glue it up
 
 Ok, now we have everything we need to put it all together. Let's recap some things. We created a docker image for our APi, and one for our WEB layer, now it's time to make it work together. As docker isolate every image running on it's own world, we have to make them talk to each other, but not only talk, we have to point each image to each other by setting some environment variables.
 
-Create network
+Let's begin by creating a dedicated network for our containers to comunicate to each other. This way they can access each other, but they cannot be accesed by another container.
 
 ```shell
 docker network create --subnet=199.18.0.0/16 k8s-bootcamp-nw
 ```
 
-Start mongo
+Cool, now we have our dedicated network, let's put some things to run on it. Let's begin by hooking up mongodb on it.
 
 ```shell
-docker run --name k8s-bootcamp-db --net k8s-bootcamp-nw --ip 199.18.0.10 -p 27017:27017 -d mongo
+docker run --name k8s-bootcamp-db --net k8s-bootcamp-nw --ip 199.18.0.10 -d mongo
 ```
 
-Start API
+If you look it closer, you will see that we passed our network to mongo, by using the parameter `--net` and set an IP for it with `--ip`. Why? Because we can controll it better if we do it like this.
+Let's hook now our API.
 
 ```shell
-docker run --name k8s-bootcamp-api --net k8s-bootcamp-nw --ip 199.18.0.11 -p3000:3000 -e MONGO=199.18.0.10 -d k8s-bootcamp/api
+docker run --name k8s-bootcamp-api --net k8s-bootcamp-nw --ip 199.18.0.11 -e MONGO=199.18.0.10 -d k8s-bootcamp/api
 ```
+
+We passed as an environment variable the mongodb ip. Cool. But for both images, why we didn't passed the port to proxy? Because don't need it, as we don't need to access those images. Remember if you don't need to access it, don't expose it, it's safer.
 
 ```shell
-docker run --name k8s-bootcamp-web --net k8s-bootcamp-nw --ip 199.18.0.12 -p 5000:5000 -e PUBLIC_URL=http://199.18.0.11:3000 -d k8s-bootcamp/web
-docker run --name k8s-bootcamp-web --net k8s-bootcamp-nw --ip 199.18.0.12 -p 5000:5000 -e PUBLIC_URL=http://199.18.0.11:3000 k8s-bootcamp/web
+docker run --name k8s-bootcamp-web --net k8s-bootcamp-nw --ip 199.18.0.12 -p 5000:80 --add-host="apiserver:199.18.0.11" -d k8s-bootcamp/web
 ```
+Now, we proxied a port here, and passed some other host to it usind the `--add-host` parameter. Why? Because we did a little trick in our final image to proxy all our api related calls to the correct host. We used nginx to do it by setting as a proxy address to point to a hostname, so we need to add a hostname pointing to some IP address.
 
-Test it
+It's a small workaround, but it works like a charm. Now access your docker address passing port 5000 and you will access the same application as before, but running from docker. But everytime you want to run your application, you will have to execute the same 4 commands, can we improve it?
 
 ### Grouping with compose
+
+```yaml
+version: '3'
+
+services:
+  database:
+    image: mongo
+  
+  apiserver:
+    image: k8s-bootcamp/api
+    environment:
+      - MONGO=database
+    depends_on:
+      - database
+    ports:
+      - "3000"
+    links:
+      - database
+
+  webserver:
+    image: k8s-bootcamp/web
+    depends_on:
+      - apiserver
+    ports:
+      - "5000:80"
+    links:
+			- apiserver
+			
+```
 
 ### Pushing to Docker Registry
 

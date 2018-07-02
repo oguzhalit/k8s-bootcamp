@@ -12,4 +12,4 @@ RUN npm run build
 #Expose the port 3000
 EXPOSE 3000
 #RUN THE APP
-cmd npm start
+CMD npm start
