@@ -83,7 +83,7 @@ export default class ListCompany extends Component{
 								<td>
 									<ButtonGroup bsSize="xsmall">
 										<Button id={value._id} onClick={this.deleteCompany}><img src={deleteIcon} className="App-logo-xsm" alt="delete" /></Button>
-										<Button href={`get/${value._id}`}><img src={editIcon} className="App-logo-xsm" alt="edit" /></Button>
+										<Button href={`/#/get/${value._id}`}><img src={editIcon} className="App-logo-xsm" alt="edit" /></Button>
 									</ButtonGroup>
 								</td>
 								<td>{value.name}</td>

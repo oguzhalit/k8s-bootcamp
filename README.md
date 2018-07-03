@@ -26,7 +26,8 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 		- [Pushing to Docker Registry](#pushing-to-docker-registry)
 		- [Kubernetes Interactive Deploy](#kubernetes-interactive-deploy)
 		- [Kubernetes deploy through file descriptor](#kubernetes-deploy-through-file-descriptor)
-		- [Kubernetes Exposing to the world](#kubernetes-exposing-to-the-world)
+		- [Kubernetes in our app](#kubernetes-in-our-app)
+		- [Porting it to vendored providers](#porting-it-to-vendored-providers)
 	- [Instrumenting](#instrumenting)
 		- [Application Performance Monitoring](#application-performance-monitoring)
 		- [Prometheus](#prometheus)
@@ -278,11 +279,16 @@ We passed as an environment variable the mongodb ip. Cool. But for both images, 
 ```shell
 docker run --name k8s-bootcamp-web --net k8s-bootcamp-nw --ip 199.18.0.12 -p 5000:80 --add-host="apiserver:199.18.0.11" -d k8s-bootcamp/web
 ```
+
 Now, we proxied a port here, and passed some other host to it usind the `--add-host` parameter. Why? Because we did a little trick in our final image to proxy all our api related calls to the correct host. We used nginx to do it by setting as a proxy address to point to a hostname, so we need to add a hostname pointing to some IP address.
 
 It's a small workaround, but it works like a charm. Now access your docker address passing port 5000 and you will access the same application as before, but running from docker. But everytime you want to run your application, you will have to execute the same 4 commands, can we improve it?
 
 ### Grouping with compose
+
+Yes we can improve it, and the first step to improve it, is by grouping all together with compose. Docker compose can help us grouping a lot of boring repetitive commands in a single file, so we can boot-up and shutdown faster and easily. Create a file called `docker-compose.yml` and we will build what we need inside it. We will begin by setting the version, and them describing all the services, one by one, in a very straightforward way. We can and we will set an order because we first need mongodb up and running before we start the API, and we need the API up to be able to run our web app. Even with this kind of restriction it's possible to use docker, and in a real scenario, we will probably have much more restrictions as this.
+
+Also, remember that, when we executed all the images manually, we managed to keep it safe, by not exposing unecessarie ports to an external world, and using compose will be the same, but easier to build. Take a look at our compose file:
 
 ```yaml
 version: '3'
@@ -290,7 +296,7 @@ version: '3'
 services:
   database:
     image: mongo
-  
+
   apiserver:
     image: k8s-bootcamp/api
     environment:
@@ -309,17 +315,695 @@ services:
     ports:
       - "5000:80"
     links:
-			- apiserver
-			
+     - apiserver
+
 ```
+
+Its easy to understand what this file describes, as compose uses a clean file format to achieve this. We are moving to our goal to put all of this in the cloud. Now you can use it with `docker-compose up -d`to start and `docker-compose down` to stop it. Cleaner and easier than the last time.
 
 ### Pushing to Docker Registry
 
+If you are wondering, where does all of this docker images come from, they came from docker registry. Docker registry is a central hub where you share your docker images with the world, so they can use it the same way as you've been using all those images. This is a public repository, and it's the default for docker. You can have your private registry as well, so if you're wondering how can you keep your images safe from the eyes of unnintended audience, you can keep a private registry inside your company, or by using a private vendor, like AWS, Google Cloud or Microsoft Azure.
+
+Let's create an account at [docker hub](https://hub.docker.com/) so we can upload our images there, and then let's log into it:
+
+```shell
+$ docker login
+Login with your Docker ID to push and pull images from Docker Hub. If you don't have a Docker ID, head over to https://hub.docker.com to create one.
+Username: paulushc
+Password:
+Login Succeeded
+```
+
+Now we need to do something before we can upload our images. You need to create am image using your username in order to upload it to docker hub. But why you didn't tell us earlier so we already built it using our usernames. Well, first you need to understand how we build an image so we can share it with the world. Let's begin by retagging our images to be use our usernames.
+
+We don't need to rebuild it from scratch. First, because docker know that every layer is already done, so it will skip some of the build parts, and second, because we just need to tag it. Let's do it then.
+
+```shell
+docker tag k8s-bootcamp/api paulushc/k8s-bootcamp-api:v1
+docker tag k8s-bootcamp/web paulushc/k8s-bootcamp-web:v1
+```
+
+Just remember to change my username to your username. Once is done, we have everything needed to send your images to docker hub. Now let's push it.
+
+```shell
+$ docker push paulushc/k8s-bootcamp-web:v1
+The push refers to repository [docker.io/paulushc/k8s-bootcamp-web]
+b606b9bfeb46: Pushed
+1ef3410d83ef: Pushed
+951c1d7bace7: Mounted from library/nginx
+91295ee17337: Mounted from library/nginx
+423678709065: Mounted from library/nginx
+cd7100a72410: Mounted from library/nginx
+v1: digest: sha256:6fafc1d301b93a919e83a904d80052d61d5c575965cc73ae8d4f793bdfc80464 size: 1570
+```
+
+Awesome, now let's push the other one, the process is the same so I will skip it from this doc. Now, let's change our compose file so we can use our remote images.
+
+```yaml
+version: '3'
+
+services:
+  database:
+    image: mongo
+
+  apiserver:
+    image: paulushc/k8s-bootcamp-api
+    environment:
+      - MONGO=database
+    depends_on:
+      - database
+    ports:
+      - "3000"
+    links:
+      - database
+
+  webserver:
+    image: paulushc/k8s-bootcamp-web
+    depends_on:
+      - apiserver
+    ports:
+      - "5000:80"
+    links:
+      - apiserver
+```
+
+Great, now if we run `docker-compose up -d` again, it will use our remote images instead of our local ones. Now we can share this compose file with our friends, parents, significant other, teacher, dog and goldfish so they can use it the same way as you. This is one of the awesome things containers give us, this kind of flexibility. The user, don't need to have node installed, it don't need to have anything but a container app installed, and in our case, docker. Another awesome thing, is that you don't need to worry about environment differences between you and the user, as you're shipping the environment along with your app. Pretty cool.
+
 ### Kubernetes Interactive Deploy
+
+Alright, now it's time to deploy it in cloud. But before we spend a penny, let's see our options. First we will be using kubernetes (as you already don't know it) to orchestrate our containers. You can start with a local cluster so you won't spend a penny while learning. First select a local cluster software to start with. I'm using [minikube](https://github.com/kubernetes/minikube/releases) as a local cluster and we also need [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl) to manage our cluster.
+
+Cool, now let's focus on deploying to our cluster. Once you follow the steps to start minikube, and after that, check if we managed to get the information from minikube with `kubectl cluster-info`. It will return some info about your cluster like:
+
+```shell
+$ kubectl cluster-info
+Kubernetes master is running at https://192.168.99.101:8443
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+```
+
+Everything you do in command prompt you can also do in the dashboard, but let's focus on the command prompt for now. Once we know that we're connected to a cluster, let's begin by checking our nodes:
+
+```shell
+$ kubectl get nodes
+NAME       STATUS    ROLES     AGE       VERSION
+minikube   Ready     <none>    7d        v1.9.4
+```
+
+Your version can be different so don't worry about it. Now let's deploy something to our cluster. We can do it in 2 ways, by running commands (called interactive way) or by a file descriptor, let's begin the same way we did with docker, first with some commands. To deploy to kubernetes, we will use a command very simmilar to docker `kubectl run`. The `run` command creates a new deployment. We need to provide the deployment name and app image location (include the full repository url for images hosted outside Docker hub). We want to run the app on a specific port so we add the --port parameter. Let's use a demo web app image. You don't need to worry about this image, it's just a random demo but it doesn't matter for now.
+
+```shell
+kubectl run k8s-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1 --port=8080
+```
+
+Yay, you've just deployed your application to kubernetes in a few seconds. Kubernetes will make sure your application is up and running and will also make sure that if it fails to load, restart it. This performed a few things for you:
+
+- searched for a suitable node where an instance of the application could be run (we have only 1 available node)
+- scheduled the application to run on that Node
+- configured the cluster to reschedule the instance on a new Node when needed
+
+To list your deployments use the `kubectl get deployments` command:
+
+```shell
+$ kubectl get deployments
+NAME           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+k8s-bootcamp   1         1         1            0           2m
+```
+
+It could take a while for your deployed image to be up and running, depending on the size of the image. That's why we focused on reducing the size of our image before, because this can impact in our deployment time. OK, now while you read this, your deployment should be finished, you can check again with the same command to see if it's avaliable. Nice, now let's see our pods.
+
+Pods are the smalles unity in a kubernetes cluster. You will find more information at the [kubernetes website](https://kubernetes.io/docs/home/). Let's proceed, let's start our proxy interface. This interface is responsible to enable the communication between our isolated pods and the external world. First, in a new console windows open the gates between the isolated world and our corrupted world by running the `kubectl proxy`. This will expose a port for you, and you will be able to access some information inside kubernetes.
+
+```shell
+$ kubectl proxy
+Starting to serve on 127.0.0.1:8001
+```
+
+Now, you can use the pod name to request the application through pod. You can do it like this:
+
+```shell
+$ kubectl get pods
+NAME                            READY     STATUS    RESTARTS   AGE
+k8s-bootcamp-6bc5b9d6bd-rq9fl   1/1       Running   0          19m
+$ curl http://localhost:8001/api/v1/namespaces/default/pods/k8s-bootcamp-6bc5b9d6bd-rq9fl/proxy/
+Hello Kubernetes bootcamp! | Running on: k8s-bootcamp-6bc5b9d6bd-rq9fl | v=1
+```
+
+Or like this:
+
+```shell
+$ export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
+$ echo Name of the Pod: $POD_NAME
+Name of the Pod: k8s-bootcamp-6bc5b9d6bd-rq9fl
+$ curl http://localhost:8001/api/v1/namespaces/default/pods/$POD_NAME/proxy/
+Hello Kubernetes bootcamp! | Running on: k8s-bootcamp-6bc5b9d6bd-rq9fl | v=1
+```
+
+This way you will be accessing theimage running inside the pod. Cool, now moving on, we need to understand that pods are mortal. Pods will born, live and die, and that's how they're built for. But when a pod die, it will change it's IP address, so it became harder to access it. To overcome this, we need to create a service to expose a fixed address to access. So far, minikune don't support LoadBalancer option, so we will use another kind of exposition, the NodePort:
+
+```shell
+$ kubectl expose deployment/k8s-bootcamp --type="NodePort" --port 8080
+service "k8s-bootcamp" exposed
+```
+
+Ok, now we can check if the service is up by running `kubectl get services` and you will see 2 entries:
+
+```shell
+$ kubectl get services
+NAME           TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+k8s-bootcamp   NodePort    10.96.236.71   <none>        8080:30908/TCP   43s
+kubernetes     ClusterIP   10.96.0.1      <none>        443/TCP          7d
+```
+
+We can access the details of our service by running the `describe` command:
+
+```shell
+$ kubectl describe services/k8s-bootcamp
+Name:                     k8s-bootcamp
+Namespace:                default
+Labels:                   run=k8s-bootcamp
+Annotations:              <none>
+Selector:                 run=k8s-bootcamp
+Type:                     NodePort
+IP:                       10.96.236.71
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  30908/TCP
+Endpoints:                172.17.0.8:8080
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+```
+
+We can use another set of commands to save an environment variable to access our pod:
+
+```shell
+$ export NODE_PORT=$(kubectl get services/k8s-bootcamp -o go-template='{{(index .spec.ports 0).nodePort}}')
+$ echo NODE_PORT=$NODE_PORT
+NODE_PORT=30908
+$ curl $(minikube ip):$NODE_PORT
+Hello Kubernetes bootcamp! | Running on: k8s-bootcamp-6bc5b9d6bd-rq9fl | v=1
+```
+
+Awesome, you can now access our instance directly, and that's great, we don't need anymore the proxy to access our container.
 
 ### Kubernetes deploy through file descriptor
 
-### Kubernetes Exposing to the world
+Let's start from the begining, now using a file descriptor. We will work with the same image again to achieve the same result. You will create a yaml file with the deployment description. This is an example of how the file is composed:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ademoweb
+  labels:
+    name: ademoweb
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  selector:
+    name: ademo-web
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  ademo-web-deploy
+  labels:
+    name: ademo-web
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: ademo-web
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image: gcr.io/google-samples/kubernetes-bootcamp:v1
+        name:  ademo-web-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        ports:
+        - containerPort:  8080
+          name:  ademo-web
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+```
+
+Cool? Now, to deploy it, we need to apply this deployment to the cluster, by using `kubectl apply -f filename.yaml`. I've called mine ademo, and as you can see, we have everything contained into this file, splitted by a bunch of dashes, we have first our service, exposing our container and then our deployment, stating which services we need to deploy. Once we apply it, we can check the deployment, pods and services and we will find everything there.
+
+```shell
+$ kubectl get deployments
+NAME               DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+ademo-web-deploy   1         1         1            1           8s
+$ kubectl get pods
+NAME                              READY     STATUS    RESTARTS   AGE
+ademo-web-deploy-6bb47d4f-rxp8x   1/1       Running   0          1m
+$ kubectl get services
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+ademoweb     NodePort    10.110.66.238   <none>        8080:31491/TCP   2m
+kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP          7d
+```
+
+And if we execute the same scripts again, changing just the name:
+
+```shell
+$ export NODE_PORT=$(kubectl get services/ademoweb -o go-template='{{(index .spec.ports 0).nodePort}}')
+$ echo NODE_PORT=$NODE_PORT
+NODE_PORT=32348
+$ curl $(minikube ip):$NODE_PORT
+Hello Kubernetes bootcamp! | Running on: ademo-web-deploy-7964c7c757-5gkpc | v=1
+```
+
+We achieved the same thing, but using just a single file. This saved us a lot of time and repetitive code. And if we change something in our deployment file, we can execute the same apply again and the deployment will be updated.
+
+### Kubernetes in our app
+
+Now, let's start working in our deployment. We will now deploy our images. So far we've been working with this demo images but this doesn't represent our current state.
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    name: mongodb
+spec:
+  type: ClusterIP
+  ports:
+  - name: tcp
+    port: 27017
+    targetPort: 27017
+  selector:
+    name: company-db
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-db
+  labels:
+    name: k8s-bootcamp-db
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name:  company-db
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  mongo
+        name:  company-db-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        ports:
+        - containerPort:  27017
+          name:  company-db
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apiserver
+  labels:
+    name: apiserver
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+  selector:
+    name: company-api
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-api
+  labels:
+    name: k8s-bootcamp-api
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: company-api
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  paulushc/k8s-bootcamp-api:v1
+        name:  company-api-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        env:
+        - name: MONGO
+          value: mongodb
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBE_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        ports:
+        - containerPort:  3000
+          name:  company-api
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    name: web
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  selector:
+    name: company-web
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-web
+  labels:
+    name: k8s-bootcamp-web
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: company-web
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  paulushc/k8s-bootcamp-web:v1
+        name:  company-web-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBE_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        ports:
+        - containerPort:  80
+          name:  company-web
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+
+```
+
+Wow that's waaaay too huge. Let's cut it into small pieces. Let's begin with database. First the service to expose mongodb to our other containers:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    name: mongodb
+spec:
+  type: ClusterIP
+  ports:
+  - name: tcp
+    port: 27017
+    targetPort: 27017
+  selector:
+    name: company-db
+```
+
+You will see that most of our services are equal. Here, we have our ports defined, and the type set as ClusterIP, so this service will be exposed to our other containers but not to the outside world. Check the selector, this is how our service will find which service it will expose.
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-db
+  labels:
+    name: k8s-bootcamp-db
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name:  company-db
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  mongo
+        name:  company-db-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        ports:
+        - containerPort:  27017
+          name:  company-db
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+```
+
+A lot of boilerplate stuff, you will find it here what container it will attach to this deployment, the deployment name, and also what ports it need to expose to the service.
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: apiserver
+  labels:
+    name: apiserver
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+  selector:
+    name: company-api
+```
+
+Again, the service for our api is veri simmilar to the mongodb, we just change the port and the selector.
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-api
+  labels:
+    name: k8s-bootcamp-api
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: company-api
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  paulushc/k8s-bootcamp-api:v1
+        name:  company-api-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        env:
+        - name: MONGO
+          value: mongodb
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBE_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        ports:
+        - containerPort:  3000
+          name:  company-api
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+```
+
+No surprises in here, we just used an environment variable to set our mongodb address. Let's go on.
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    name: web
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  selector:
+    name: company-web
+```
+
+The only difference in here is the type, now we used NodePort, to expose our port to the outside world. We only use NodePort, because we can't use LoadBalancer in minikube.
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-web
+  labels:
+    name: k8s-bootcamp-web
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: company-web
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  paulushc/k8s-bootcamp-web:v1
+        name:  company-web-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBE_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        ports:
+        - containerPort:  80
+          name:  company-web
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+```
+
+No serrets here as well. You will see that we split the information with 3 dashes, and this way we can use a single file to describe our complete deployment. Very neat.
+
+### Porting it to vendored providers
 
 ## Instrumenting
 
