@@ -29,9 +29,19 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 		- [Kubernetes in our app](#kubernetes-in-our-app)
 		- [Porting it to vendored providers](#porting-it-to-vendored-providers)
 	- [Instrumenting](#instrumenting)
-		- [Application Performance Monitoring](#application-performance-monitoring)
+		- [Application Performance Management](#application-performance-management)
+		- [Is APM expensive? It doesn’t have to be](#is-apm-expensive-it-doesn%E2%80%99t-have-to-be)
 		- [Prometheus](#prometheus)
+			- [What is Prometheus](#what-is-prometheus)
+			- [When does it fit](#when-does-it-fit)
+			- [When does it not fit](#when-does-it-not-fit)
 		- [Instrumenting the Application](#instrumenting-the-application)
+			- [Metric types](#metric-types)
+				- [Counter](#counter)
+				- [Gauge](#gauge)
+				- [Histogram](#histogram)
+				- [Summary](#summary)
+			- [Getting our hands dirty](#getting-our-hands-dirty)
 		- [Scrapping the Application with Prometheus](#scrapping-the-application-with-prometheus)
 		- [Consolidating telemetry data](#consolidating-telemetry-data)
 		- [Dashboard on Grafana](#dashboard-on-grafana)
@@ -1001,19 +1011,210 @@ spec:
       restartPolicy: Always
 ```
 
-No serrets here as well. You will see that we split the information with 3 dashes, and this way we can use a single file to describe our complete deployment. Very neat.
+Nothing new here as well. You will see that we split the information with 3 dashes, and this way we can use a single file to describe our complete deployment. Very neat.
 
 ### Porting it to vendored providers
 
 ## Instrumenting
 
-### Application Performance Monitoring
+Right now, you're probably asking yourself, what is instrumentation. According to the internet, "instrumentation refers to an ability to monitor or measure the level of a product's performance, to diagnose errors and to write trace information.Programmers implement instrumentation in the form of code instructions that monitor specific components in a system (for example, instructions may output logging information to appear on screen). When an application contains instrumentation code, it can be managed using a management tool. Instrumentation is necessary to review the performance of the application. Instrumentation approaches can be of two types: Source instrumentation and binary instrumentation."
+
+Indeed, instrumentation is when you add some pieces of code to track how your application is behaving. A fancy term is used by the industri, and it's called APM, or Application Performance Management. You need to be very carefull when you add instrumentation to your code, because it will introduce overhead to your application, so it's a matter of how much your instrumentation will impact the code execution, and sometimes, even if the impact is big, the kind of insight added by the instrumentation can certainly payback. Be wise when instrumenting your application, and don't try to reinvent the weel,  always use some kind of plugin, client or library to instrument your code.
+
+### Application Performance Management
+
+APM is all about understanding the "why" as fast as possible. If you want to measure the performance of a web application, it is pretty trivial to parse the access logs and get an idea of how long web requests take. This would give you an idea about overall performance and which pages are slow. Unfortunately, it doesn’t answer the key question of why.
+
+The heart of APM solutions is understanding why transactions in your application are slow or failing. For example, a development or operations team can instantly tell from this visual that their database is causing some performance spikes. They can also leverage their APM to identify exactly which database query and web requests were affected.
+
+APM solutions can help identify common application problems quickly:
+
+- Track overall application usage to understand spikes in traffic
+- Find slowness or connection problems with application dependencies including SQL, queues, caching, etc
+- Identify slow SQL queries
+- Find highest volume and slowest web pages or transactions
+
+### Is APM expensive? It doesn’t have to be
+
+Traditionally, application performance management tools have been an expensive luxury item that only large IT enterprises could afford. Many APM vendors still cater to the larger enterprises, still charging $2,000-$4,000 per year per server. Ouch!
+
+Most APM solutions are very complex to configure and use. So much so that development teams don’t even use them. They end up being expensive traffic lights and dashboards. Some vendors have put a huge focus on making their products affordable and very easy to use so they can be available to development and operations teams of all sizes. That's why Prometheus is a good choice, it's open-source, easy to use and you can deploy inside your existing infrastructure. You can deploy it on bare metal or in a cloud provider. In fact, there is a lot of ready-made docs to run prometheus in a cloud like structure or already present.
 
 ### Prometheus
 
+#### What is Prometheus
+
+Prometheus is an open-source systems monitoring and alerting toolkit originally built at SoundCloud. Since its inception in 2012, many companies and organizations have adopted Prometheus, and the project has a very active developer and user community. It is now a standalone open source project and maintained independently of any company. To emphasize this, and to clarify the project's governance structure, Prometheus joined the Cloud Native Computing Foundation in 2016 as the second hosted project, after Kubernetes.
+
+Prometheus's main features are:
+
+- a multi-dimensional data model with time series data identified by metric name and key/value pairs
+- a flexible query language to leverage this dimensionality
+- no reliance on distributed storage; single server nodes are autonomous
+- time series collection happens via a pull model over HTTP
+- pushing time series is supported via an intermediary gateway
+- targets are discovered via service discovery or static configuration
+- multiple modes of graphing and dashboarding support
+
+The Prometheus ecosystem consists of multiple components, many of which are optional:
+
+- the main Prometheus server which scrapes and stores time series data
+- client libraries for instrumenting application code
+- a push gateway for supporting short-lived jobs
+- special-purpose exporters for services like HAProxy, StatsD, Graphite, etc.
+- an alertmanager to handle alerts
+- various support tools
+
+Most Prometheus components are written in Go, making them easy to build and deploy as static binaries.
+
+This diagram illustrates the architecture of Prometheus and some of its ecosystem components:
+
+![prometheus arch](../docs/prometheus-architecture.svg)
+
+Prometheus scrapes metrics from instrumented jobs, either directly or via an intermediary push gateway for short-lived jobs. It stores all scraped samples locally and runs rules over this data to either aggregate and record new time series from existing data or generate alerts. Grafana or other API consumers can be used to visualize the collected data.
+
+#### When does it fit
+
+Prometheus works well for recording any purely numeric time series. It fits both machine-centric monitoring as well as monitoring of highly dynamic service-oriented architectures. In a world of microservices, its support for multi-dimensional data collection and querying is a particular strength.
+
+Prometheus is designed for reliability, to be the system you go to during an outage to allow you to quickly diagnose problems. Each Prometheus server is standalone, not depending on network storage or other remote services. You can rely on it when other parts of your infrastructure are broken, and you do not need to setup extensive infrastructure to use it.
+
+#### When does it not fit
+
+Prometheus values reliability. You can always view what statistics are available about your system, even under failure conditions. If you need 100% accuracy, such as for per-request billing, Prometheus is not a good choice as the collected data will likely not be detailed and complete enough. In such a case you would be best off using some other system to collect and analyze the data for billing, and Prometheus for the rest of your monitoring.
+
 ### Instrumenting the Application
 
+Ok Cool, let's get our hands dirty, we need to add some instrumentation code to our application. I will not focus on putting prometheus up and running, as there is a ton of tutorials out there explaining how to do it. Before we instrument it, let's check how much time it took to fulfill an operation before we instrument it. This way, we can check if our instrumentation added overhead to our operation.
+
+It's easy and is a homemade solution, let's add to each method a combination of `console.time('xxxxx')` and `console.timeEnd('xxxxx')` of a timer. Just remember to keep the same name, we will use the methods name.
+
+```javascript
+public addNewCompany(req: Request, res: Response) {
+  console.time('addCompany');
+  let newContact = new Company(req.body);
+  newContact.save((err, contact) => {
+    if (err) {
+      res.send(err);
+    }
+    res.json(contact);
+  });
+  console.timeEnd('addCompany');
+}
+```
+
+We teste it a bunch of times, and as you can see the first one always take a longer time to execute, due to mongoDB. Don't worry, but we will catch this later on prometheus. There is a mechanism to "ignore" this kind of higer time.
+
+```shell
+addCompany: 11.887ms
+addCompany: 1.121ms
+addCompany: 1.005ms
+addCompany: 1.182ms
+addCompany: 1.005ms
+addCompany: 0.909ms
+addCompany: 0.974ms
+addCompany: 1.015ms
+addCompany: 1.182ms
+addCompany: 3.973ms
+addCompany: 1.025ms
+```
+
+ We will add it to our CompanyController, because this is where the magic happens. You need to understand your application to check where you going to add your instrumentation, specially to avoid duplicates. Now we need to add a variable to controll how we gonna instrument. We will use a histogram to count, and a histogram uses a couple of buckets to count the values between, to prevent us from having an infinity variation of values. Let's have a look at our possible metrics.
+
+#### Metric types
+
+The Prometheus client libraries offer four core metric types. These are currently only differentiated in the client libraries (to enable APIs tailored to the usage of the specific types) and in the wire protocol. The Prometheus server does not yet make use of the type information and flattens all data into untyped time series. This may change in the future.
+
+##### Counter
+
+A counter is a cumulative metric that represents a single monotonically increasing counter whose value can only increase or be reset to zero on restart. For example, you can use a counter to represent the number of requests served, tasks completed, or errors. Do not use a counter to expose a value that can decrease. For example, do not use a counter for the number of currently running processes; instead use a gauge.
+
+##### Gauge
+
+A gauge is a metric that represents a single numerical value that can arbitrarily go up and down. Gauges are typically used for measured values like temperatures or current memory usage, but also "counts" that can go up and down, like the number of online users.
+
+##### Histogram
+
+A histogram samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values. A histogram with a base metric name of <basename> exposes multiple time series during a scrape:
+
+- cumulative counters for the observation buckets, exposed as <basename>_bucket{le="<upper inclusive bound>"}
+- the total sum of all observed values, exposed as <basename>_sum
+- the count of events that have been observed, exposed as <basename>_count (identical to <basename>_bucket{le="+Inf"} above)
+
+##### Summary
+
+Similar to a histogram, a summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window. A summary with a base metric name of <basename> exposes multiple time series during a scrape:
+
+- streaming φ-quantiles (0 ≤ φ ≤ 1) of observed events, exposed as <basename>{quantile="<φ>"}
+- the total sum of all observed values, exposed as <basename>_sum
+- the count of events that have been observed, exposed as <basename>_count
+
+#### Getting our hands dirty
+
+Ok let's now implement our histogram, because as mentioned in the previous section, histogram samples observations, and we want to observe our response time for each endpoint. Let's begin by adding our dependencies to the project and to the `CompanyController.ts`. Add prometheus dependencies to our project with `npm i --save prom-client` and it we're good to go. Now import the prom-client.
+
+```javascript
+import * as Prometheus from 'prom-client'
+```
+
+After that, we can create a variable to hold our histogram values.
+
+```javascript
+const httpRequestDurationMicroseconds = new Prometheus.Histogram({
+  name: 'http_request_duration_ms',
+  help: 'Duration of HTTP requests in ms',
+  labelNames: ['route'],
+  buckets: [0.10,5,15,50,100,200,300,400,500,600,800,1000,1100,1200]
+});
+```
+
+With this at hand, we just need to use it. We can use it in a bunch of ways, one way is by setting it on start and calling an end when finished:
+
+```javascript
+const end = httpRequestDurationMicroseconds
+      .labels(req.route.path)
+      .startTimer();
+      //Block of code here
+end();
+```
+
+But now take a loot at our manual profilling. It doubled the time of the first execution, but at general, we got higher results as well, but nothing too problematic if we managed to add some insights about our application behaviour.
+
+```shell
+addCompany: 22.373ms
+addCompany: 3.001ms
+addCompany: 1.553ms
+addCompany: 1.199ms
+addCompany: 2.253ms
+addCompany: 1.180ms
+addCompany: 1.227ms
+addCompany: 1.194ms
+addCompany: 1.063ms
+addCompany: 2.101ms
+addCompany: 1.702ms
+addCompany: 1.218ms
+```
+
+Let's add this to our other endpoints as well.
+
+Once we add it, let's move to Prometheus and set how prometheus will scrape the metrics from our application.
+
 ### Scrapping the Application with Prometheus
+
+One of the things that really catches my attention is that prometheus scrape the metrics from our application, leaving ourselfs in need only to implement an endpoint to prometheus work with, so you don't need to send metrics to another place, which is awesome. Why? Follow me here.
+
+Let's assume a scenario where you need to push yours metrics against a server, if the metric server goes down, for any reason, you will end up with an application generating a bunch of error messages on log, or even crashing due to this. With prometheus scrapping the metris, we don't need to worry about this, as prometheus is the one who is requesting the data, and for an application like ours, it will only add a request every XX seconds, so it's not a big deal.
+
+Let's add to our `CompanyRoutes.ts`a new route pointing to `/metrics` because prometheus will look for this endpoint. You can change it on prometheus config, but, c'mon, there is no problem on exposing an endpoit with this name.... or does?
+
+```javascript
+import * as Prometheus from 'prom-client'
+//Our code here
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', Prometheus.register.contentType)
+    res.end(Prometheus.register.metrics())
+});
+```
 
 ### Consolidating telemetry data
 

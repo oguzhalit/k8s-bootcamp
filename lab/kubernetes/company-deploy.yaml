@@ -34,7 +34,7 @@ spec:
       imagePullSecrets:
         - name: acr-secret
       containers:
-      - image:  mongo
+      - image:  mongo:3.2-jessie
         name:  company-db-cntnr
         resources:
           requests:
@@ -87,7 +87,7 @@ spec:
       imagePullSecrets:
         - name: acr-secret
       containers:
-      - image:  paulushc/k8s-bootcamp-api:v1
+      - image:  paulushc/k8s-bootcamp-api:v2
         name:  company-api-cntnr
         resources:
           requests:
@@ -155,7 +155,7 @@ spec:
       imagePullSecrets:
         - name: acr-secret
       containers:
-      - image:  paulushc/k8s-bootcamp-web:v1
+      - image:  paulushc/k8s-bootcamp-web:v2
         name:  company-web-cntnr
         resources:
           requests:
