@@ -67,6 +67,22 @@ spec:
   selector:
     name: company-api
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext-apiserver
+  labels:
+    name: apiserver
+spec:
+  type: ExternalName
+  externalName: apiserver.default.svc.cluster.local
+  ports:
+  - name: http
+    port: 3123
+    targetPort: 3000
+  selector:
+    name: company-api
+---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -132,6 +148,7 @@ spec:
   - name: http
     port: 80
     targetPort: 80
+    nodePort: 32000
   selector:
     name: company-web
 ---
