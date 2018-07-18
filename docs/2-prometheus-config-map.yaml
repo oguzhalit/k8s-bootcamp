@@ -48,7 +48,7 @@ data:
           target_label: __metrics_path__
           replacement: /api/v1/nodes/${1}/proxy/metrics
 
-      
+
       - job_name: 'kubernetes-pods'
 
         kubernetes_sd_configs:
@@ -96,7 +96,7 @@ data:
           regex: (.+)
           target_label: __metrics_path__
           replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
-      
+
       - job_name: 'kubernetes-service-endpoints'
 
         kubernetes_sd_configs:
@@ -127,12 +127,12 @@ data:
         - source_labels: [__meta_kubernetes_service_name]
           action: replace
           target_label: kubernetes_name
-      
-      - job_name: 'prometheus'
-        scrape_interval: 5s
+
+      - job_name: 'company-api'
+        scrape_interval: 10s
 
         static_configs:
-          - targets: ['ext-apiserver:3123']
+          - targets: ['apiserver.default:3000']
             labels:
               service: 'api'
               group: 'production'

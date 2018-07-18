@@ -70,16 +70,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ext-apiserver
+  name: apiserver2
   labels:
     name: apiserver
 spec:
-  type: ExternalName
-  externalName: apiserver.default.svc.cluster.local
+  type: NodePort
   ports:
   - name: http
-    port: 3123
+    port: 3000
     targetPort: 3000
+    nodePort: 32003
   selector:
     name: company-api
 ---
