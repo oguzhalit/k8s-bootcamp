@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { FormGroup, ControlLabel, FormControl, HelpBlock, Button } from 'react-bootstrap';
 import * as routes from './routes';
+import * as config from './config';
 
 const FieldGroup = ({ id, label, help, ...props })  => {
 	return (
@@ -39,7 +40,7 @@ export default class AddCompany extends Component {
 	}
 
 	addCompanyToAPI() {
-		fetch('/api/company', {
+		fetch(`${config.default.PUBLIC_URL}/api/company`, {
 			method: 'POST',
 			headers: {
 				'Accept': 'application/json',

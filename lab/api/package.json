@@ -1,25 +1,63 @@
 {
-  "name": "api",
-  "version": "1.0.0",
-  "description": "",
-  "main": "src/App.js",
-  "scripts": {
-    "preinstall": "npm install -g typescript ts-node",
-    "build": "tsc",
-    "dev": "ts-node ./src/Server.ts",
-    "start": "nodemon ./build/Server.js",
-    "prod": "npm run build && npm run start",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@types/dotenv": "^4.0.3",
-    "@types/express": "^4.16.0",
-    "@types/mongoose": "^5.0.18",
-    "body-parser": "^1.18.3",
-    "dotenv": "^6.0.0",
-    "express": "^4.16.3",
-    "mongoose": "^5.1.7"
-  }
+ "name": "companyhub-api",
+ "version": "1.0.0",
+ "description": "Company Hub API used by the demo daitan-k8s-bootcamp",
+ "main": "src/Server.ts",
+ "keywords": [
+  "bootcamp",
+  "nodejs",
+  "api",
+  "kubernetes",
+  "docker",
+  "prometheus",
+  "devops"
+ ],
+ "homepage": "https://github.com/paulushcgcj/daitan-k8s-bootcamp",
+ "bugs": {
+  "url": "https://github.com/paulushcgcj/daitan-k8s-bootcamp/issues",
+  "email": "paulushc@gmail.com"
+ },
+ "scripts": {
+  "preinstall": "npm install -g typescript ts-node cross-env mocha tsc",
+  "build": "tsc",
+  "dev": "cross-env NODE_ENV=dev ts-node ./src/Server.ts",
+  "start": "cross-env NODE_ENV=production nodemon ./build/src/Server.js",
+  "prod": "cross-env NODE_ENV=production nodemon ./build/src/Server.js",
+  "test": "cross-env NODE_ENV=testing mocha -r ts-node/register ./src/Tests/*.ts --timeout 5000 --exit",
+  "coverage": "cross-env NODE_ENV=testing nyc --reporter=html --reporter=text --reporter=text-lcov mocha -r ts-node/register ./src/Tests/*.ts --timeout 5000 --exit"
+ },
+ "author": {
+  "name": "Paulo Gomes da Cruz Jr",
+  "email": "paulushc@gmail.com"
+ },
+ "license": "MIT",
+ "repository": {
+  "url": "https://github.com/paulushcgcj/daitan-k8s-bootcamp.git",
+  "type": "git"
+ },
+ "dependencies": {
+  "@types/dotenv": "^4.0.3",
+  "@types/express": "^4.16.0",
+  "@types/mongoose": "^5.0.18",
+  "@types/supertest": "^2.0.4",
+  "body-parser": "^1.18.3",
+  "cross-env": "^5.2.0",
+  "dotenv": "^6.0.0",
+  "express": "^4.16.3",
+  "mockgoose": "^7.3.5",
+  "mongoose": "^5.1.7",
+  "morgan": "^1.9.0",
+  "nodemon": "^1.17.5",
+  "prom-client": "^11.1.1"
+ },
+ "devDependencies": {
+  "@types/chai": "^4.1.4",
+  "@types/mocha": "^5.2.3",
+  "chai": "^4.1.2",
+  "mocha": "^5.2.0",
+  "nyc": "^12.0.2",
+  "supertest": "^3.1.0",
+  "ts-node": "^7.0.0",
+  "typings": "^2.1.1"
+ }
 }

@@ -1,3 +1,4 @@
 export const LIST = '/';
-export const ADD = '/_';
-export const UPDATE = '/_/:id'
+export const ADD = '/add';
+export const UPDATE = '/get/:id'
+export const GET = '/get'

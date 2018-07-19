@@ -1,8 +1,8 @@
 import * as express from "express";
 import * as bodyParser from "body-parser";
 import { Routes } from "./Routes/CompanyRoutes";
-
 import * as mongoose from "mongoose";
+import { Mockgoose } from "mockgoose";
 
 class App {
 
@@ -24,7 +24,13 @@ class App {
 
 	private mongoSetup(): void {
 		(mongoose as any).Promise = global.Promise;
-		mongoose.connect(this.mongoUrl);
+
+		if (process.env.NODE_ENV === 'testing') {
+			new Mockgoose(mongoose).prepareStorage().then(() =>  mongoose.connect(this.mongoUrl) );
+		} else {
+			mongoose.connect(this.mongoUrl);
+		}
+
 	}
 
 }

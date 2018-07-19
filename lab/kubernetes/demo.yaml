@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ademoweb
+  labels:
+    name: ademoweb
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  selector:
+    name: ademo-web
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  ademo-web-deploy
+  labels:
+    name: ademo-web
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: ademo-web
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image: gcr.io/google-samples/kubernetes-bootcamp:v1
+        name:  ademo-web-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        ports:
+        - containerPort:  8080
+          name:  ademo-web
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always

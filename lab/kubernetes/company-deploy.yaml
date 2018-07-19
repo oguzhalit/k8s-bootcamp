@@ -1,0 +1,204 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    name: mongodb
+spec:
+  type: ClusterIP
+  ports:
+  - name: tcp
+    port: 27017
+    targetPort: 27017
+  selector:
+    name: company-db
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-db
+  labels:
+    name: k8s-bootcamp-db
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name:  company-db
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  mongo:3.2-jessie
+        name:  company-db-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        ports:
+        - containerPort:  27017
+          name:  company-db
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apiserver
+  labels:
+    name: apiserver
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+  selector:
+    name: company-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apiserver2
+  labels:
+    name: apiserver
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    nodePort: 32003
+  selector:
+    name: company-api
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-api
+  labels:
+    name: k8s-bootcamp-api
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: company-api
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  paulushc/k8s-bootcamp-api:v2
+        name:  company-api-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        env:
+        - name: MONGO
+          value: mongodb
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBE_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        ports:
+        - containerPort:  3000
+          name:  company-api
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    name: web
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    nodePort: 32000
+  selector:
+    name: company-web
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name:  company-k8s-deploy-web
+  labels:
+    name: k8s-bootcamp-web
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: company-web
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+      - image:  paulushc/k8s-bootcamp-web:v2
+        name:  company-web-cntnr
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBE_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        ports:
+        - containerPort:  80
+          name:  company-web
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        imagePullPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always

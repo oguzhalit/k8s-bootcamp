@@ -1,0 +1,1 @@
+export default { PUBLIC_URL: '' }
