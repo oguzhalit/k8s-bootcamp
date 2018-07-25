@@ -22,11 +22,11 @@ export default class ListCompany extends Component{
 	}
 
 	componentDidMount() {
-		console.log('Public URL IS ON ', config.default.PUBLIC_URL);
-		fetch(`${config.default.PUBLIC_URL}/api/company`)
-			.then(response => response.json())
-			.then(response => this.setState({ companies:response }))
-			.catch(err => console.log('Error', err));
+		this.props.fetchCompanies()
+			.then(companies => {
+				this.setState({ companies });
+			})
+			.catch(console.log)
 	}
 
 	editCompany(id) {
