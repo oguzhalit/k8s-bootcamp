@@ -1,0 +1,88 @@
+image: node:latest
+
+services:
+  - docker:dind
+
+variables:
+  DOCKER_DRIVER: overlay
+
+cache:
+  paths:
+  - node_modules/
+  - build/
+
+stages:
+  - test
+  - build
+  - artifact
+  - deploy
+
+test:
+  stage: test
+  script:
+   - npm install
+   - npm test -- -u
+
+build_app:
+  stage: build
+  script:
+    - npm run build
+  only:
+    - master
+  artifacts:
+    paths:
+    - build/
+    expire_in: 1 week
+
+build_image:
+  stage: artifact
+  image: docker:git
+  before_script:
+    - docker login -u $DOCKER_USERNAME -p "$DOCKER_TOKEN"
+  script:
+    - docker build -t "$DOCKER_USERNAME/$CI_PROJECT_NAME:${CI_PIPELINE_ID}" .
+    - docker push "$DOCKER_USERNAME/$CI_PROJECT_NAME:${CI_PIPELINE_ID}"
+  only:
+    - master
+
+deploy_firebase:
+  stage: deploy
+  environment:
+    name: Firebase
+    url: https://daitan-k8s-bootcamp.firebaseapp.com
+  only:
+    - master
+  script:
+    - npm install -g firebase-tools
+    - firebase use --token $FIREBASE_TOKEN daitan-k8s-bootcamp
+    - firebase deploy -m "Pipeline $CI_PIPELINE_ID, build $CI_BUILD_ID" --non-interactive --token $FIREBASE_TOKEN
+  when: manual
+
+heroku-deploy:
+  stage: deploy
+  script:
+    - 'git remote add heroku https://$DOCKER_USERNAME:$HEROKU_TOKEN@git.heroku.com/daitan-k8s-bootcamp-web.git'
+    - 'git push -f heroku master'
+  environment:
+    name: Heroku
+    url: https://daitan-k8s-bootcamp-web.herokuapp.com/
+  only:
+    - master
+  when: manual
+
+deploy_gkc:
+  stage: deploy
+  image: google/cloud-sdk:alpine
+  environment:
+    name: Kubernetes
+  script:
+    - echo $GKC_TOKEN > credential_key.json
+    - gcloud auth activate-service-account --key-file=credential_key.json
+    - gcloud config set project daitan-k8s-bootcamp
+    - gcloud components install kubectl --quiet
+    - gcloud container clusters get-credentials daitank8sbootcamp --zone us-central1-a
+    - sed -i "s/paulushc\/k8s-bootcamp-web:v2/$DOCKER_USERNAME\/$CI_PROJECT_NAME:${CI_PIPELINE_ID}/g" cloud-company-deploy.yaml
+    - kubectl apply -f cloud-company-deploy.yaml
+  only:
+    - master
+  when: manual

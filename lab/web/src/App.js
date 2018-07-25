@@ -6,7 +6,8 @@ import * as routes from './routes';
 import ListCompany from './ListCompany';
 import AddCompany from './AddCompany';
 import UpdateCompany from './UpdateCompany';
-import { Navbar,Nav,NavItem } from 'react-bootstrap';
+import { Navbar,Nav } from 'react-bootstrap';
+import withCompanyFetching from './withCompanyFetching';
 
 class App extends Component {
   render() {
@@ -30,7 +31,7 @@ class App extends Component {
 						</Nav>
 					</Navbar>
 					<Switch>
-						<Route exact path={routes.LIST} component={ListCompany} />
+						<Route exact path={routes.LIST} component={withCompanyFetching(ListCompany)} />
 					<Route path={routes.ADD} component={AddCompany} />
 						<Route path={routes.UPDATE} component={UpdateCompany} />
 					</Switch>
