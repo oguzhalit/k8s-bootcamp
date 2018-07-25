@@ -47,11 +47,14 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 		- [Dashboard on Grafana](#dashboard-on-grafana)
 		- [Extracting Insights](#extracting-insights)
 	- [Continuous Integration and Deployment](#continuous-integration-and-deployment)
+		- [Integration of what](#integration-of-what)
+		- [Deploy or Delivery](#deploy-or-delivery)
 		- [Splitting the steps](#splitting-the-steps)
-		- [Building the automation file](#building-the-automation-file)
 		- [Managing Secrets](#managing-secrets)
-		- [Deploying to Heroku](#deploying-to-heroku)
-		- [Deploying to Kubernetes](#deploying-to-kubernetes)
+		- [Deploying](#deploying)
+			- [Deploying to Firebase](#deploying-to-firebase)
+			- [Deploying to Heroku](#deploying-to-heroku)
+			- [Deploying to Kubernetes](#deploying-to-kubernetes)
 	- [Something Missing](#something-missing)
 		- [Know issues](#know-issues)
 
@@ -1224,15 +1227,176 @@ app.get('/metrics', (req, res) => {
 
 ## Continuous Integration and Deployment
 
+According to Atlassian website, DevOps is a set of practices focused on automating processes between teams of devs and IT to create, test and release software in a faster and reliable way. The concept of DevOps is based on creating a collaboration culture between teams which historicaly operate in relative silos. The promised benefits include a bigger confidence, faster releases, the hability to solve critical issues faster and better workload management of unplanned jobs. It's an amazing explanation about DevOps, and now we`re gonna focus in one of the aspects of it, process automation.
+
+Testing routines are prone to error, because someone will, eventually enter a value to move through the "happy path" or even skip parts of it, just to save time because they have a demand from the management. This is a well know scenario, and we try to avoid it by automating some of this steps using `Continuous Integration`, to automate all the tests in a pipeline. But we don't plan to automate just the tests, but all the manual steps required to validate, verify, test and generate releases. But let's focus first on understanding what is a CI pipeline.
+
+### Integration of what
+
+CI is there to help us doing some tasks that normally will be executed by someone who don't want to do it, so they will always execute it in the worst possible way. To avoid poor quality checks, we ask computers, who don't mind doing the same thing over and over, and we just automate it. But how? Some people think that creating a CI pipeline is like rocket science, where you need to do a huge effort to build it, but don't be confused with this fancy name.
+
+To make it clear, building a pipeline is just a matter of analysing everything you have to do manually and you hate it, and put some set of `scripts` to do it for you. But scripts? Are you talking about complicated shell scripts that are prone to fail because I don't understand it? No, definitely no!!
+
+Let's begin with a small exercice of what you need to do in order to generate a new release of your product. First.... you code, or at least we expect you to do so, and after you finish your fancy piece of code, you will probably run some tests to make sure it works as expected, be it unit tests, integrated tests or just some manual tests. At 2 AM, you don't want to test this code, because you spent the last 8 hours working in a masterpiece, and it gonna work anyway because you are a genius. So you bundle it, get the build result, and put it to run somewhere. You access the server, upload it, and overwrite the existing ones, and go to sleep.... at 4 AM. Nice....... no, not nice.
+
+One day, you realise that you spend at least 10% of your time, testing, bundling and deploying the same thing over and over, and this took you precious amont of time that you could be spending playing with your kids, or fixing other issues or even playing Clash Royale, but you're there, repeating and repeating. That's the moment when you automate it. And how? Let's recap.
+
+You need to test it right? Cool, make the computer test it for you everytime you submit a code to the repository. If it fails, you will get notified, and you have some free time to do other things. Next, you normally bundle it, so make the computer bundle it for you. It could also submit this new artifact to somewhere, be it a maven repo, a npm repo or anywhere else, but it will make it avaliable for you and your buddies to get that exact same version you already tested, without any change and run it, locally or on a server. Cool, now you saved more time to play Call of Duty. Easy. So if you take a look at what we did, we just got the very same steps you did by hand, and make a computer do it for you, this is automating, this is a continuous integration pipeline, and it will repeat it for every piece of code you submitted. Now you have a higher degree of confidence that a code that reaches production is tested and validated completely, that bundle was generated without interference, and you have different versions to move up or down, and you don't need to checkout a specific commit in order to generate an older version again. Now, that we saved part of our time, let's save another one, automating the deployment.
+
+### Deploy or Delivery
+
+One of the greatest questions of mankind, what's the difference between delivery and deploy, according to Carl Caum, PM of Puppet, `Continuous Delivery doesn't mean every change is deployed to production ASAP. It means every change is proven to be deployable at any time`. Got it? Let's make it clear.
+
+Not all companies deploy every code change that enters the repo, they normally work in a cycle, where you wait for some time before you release it, but an agile team will work hard to fix all the issues as soon as possible, and as we already understood in the last topic, every code change will trigger a CI pipeline, and it will end up with a bundle ready to be deployed, but this doesn't mean you will deploy it on production after it's done.... or do?
+
+If you do, congrats, you achieved a higher level of maturity, deploying to production like this means you company is aiming to a smaller time-to-market, but this doesn't mean they are the correct sollution. Some companies like to keep it controlled, rolling deploys in a controlled way, but still whant to leverage the cool things that automation brings, so they plan a cycle, and at the end of the cycle, they will have a deliverable piece of code, which is a result of the other deliverables, and once they have a GO, they will reach production. This also show a high degree of maturity of the company, they just like to play safe. Continuous deployment it's just the next step on the line, making everything automated, and it's also cool, but the minimal requirement you need to be a true automated DevOps team, is continuous delivery. Getting back to our example, after we played a lot of Candy Crush, we decided that logging into a server to download a binary, stop and restart everything is a pain and we wanna put all this in an automated task, so we jus't need to hit a button or something like this in order to deploy it. Pretty cool.
+
 ### Splitting the steps
 
-### Building the automation file
+Now that we know the meaning of CI and CD, let's build it ourselves. I've splitted this project and got only the web app insode our lab folder and put it into [another git project on GitLab](https://gitlab.com/paulushc/daitan-k8s-bootcamp-web). Right now, you could be thinking why I didn't used GitHub + CircleCI, and the reason is just one, I can use gitlab with private repos for free, and it has a built in CI system, which is also free and private as well, so I can keep some of my projects aside from curious eyes, and keep working using everything I normally do, but you need to understand that those Ci systems are just ways to achieve this, they are not the only sollution. You could, if you want to, build your own, using webhooks and shell scripts, and that's fine. Don't fall into that trap that you could only be doing DevOps if you use `tool X` or `tool Y`, because DevOps is a set of things, not a set of tools. Ok, so let's split our process.
+
+Let' begin with the top of our CI file, create a file in your project root folder called `.gitlab-ci.yml` and add some things to it. I will not enter in details, you can find the documentation on [GitLab website](https://docs.gitlab.com/ee/ci/yaml/). Let's begin by adding some information that will be used during most of our jobs.
+
+```yaml
+image: node:latest
+
+services:
+  - docker:dind
+
+variables:
+  DOCKER_DRIVER: overlay
+
+cache:
+  paths:
+  - node_modules/
+  - build/
+
+stages:
+  - test
+  - build
+  - artifact
+  - deploy
+```
+
+We begin by writing some test cases to make sure our code is cool. Then, we write the test script into our package.json so we can run it using NPM easily like this, `"test": "react-scripts test --env=jsdom"` and we can use it in our CI configuration. As we built our project using `create-react-app` it already provided us some scripts, and we will use it as it is. You can apply the same things in your current application, just keeping in mind the steps you normally take in order to execute the full validation, test and release of the application.
+
+Let's add to our file the test job.
+
+```yaml
+test:
+  stage: test
+  script:
+   - npm install
+   - npm test
+```
+
+You will see that there is nothing unexpected here, we run `npm install` to install our dependencies and execute our tests. Nothing too fancy, and it's the very same commands you would normally execute in your local machine right? Good, let's move to the next step... build it up.
+
+```yaml
+build_app:
+  stage: build
+  script:
+    - npm run build
+  only:
+    - master
+  artifacts:
+    paths:
+    - build/
+    expire_in: 1 week
+```
+
+Again, everything here inside our script is know stuff, just a simple build. We ask gitlab to save the build folder as an artifact for us, so we can download it. We could also send it to somewhere else, but in our case, we won't do it. Now if you remember, we built the application as a docker image, let's do it here as well.
+
+```yaml
+build_image:
+  stage: artifact
+  image: docker:git
+  before_script:
+    - docker login -u $DOCKER_USERNAME -p "$DOCKER_TOKEN"
+  script:
+    - docker build -t "$DOCKER_USERNAME/$CI_PROJECT_NAME:${CI_PIPELINE_ID}" .
+    - docker push "$DOCKER_USERNAME/$CI_PROJECT_NAME:${CI_PIPELINE_ID}"
+  only:
+    - master
+```
+
+Same know commands right? we run before we begin the login command to log into docker hub. If you have a private image registry, you could login into it, and build & push the image. We just use some variables to make this CI file easy to be reused in other projects. Even being unique to each project, it's better to be able to reuse some of the jobs in our other projects, because it's save us some time. I've used the pipeline id as a tag, but, the best approach here would be to use for example the git tag, if you use an approach where you tag every release for example. I will explain the deploy part later, so let's move to a more, sensible part, managing secrets.
 
 ### Managing Secrets
 
-### Deploying to Heroku
+You don't want to expose your secrets like passwords, usernames and so on to the world, so you need to use secrets. Secrets are just a bunch of Key-Value things where you store your sensitive data away from the eyes of the world. On gitlab you can store your secrets on the project settings, inside Ci/CD variables. This is also good to make our CI jobs much more reusable, as we just have to change the secrets value in each of our project variables, or even in our groups if you share some common things between projects. Never keep sensitive data scattered along your project.
 
-### Deploying to Kubernetes
+### Deploying
+
+Ok, let's proceed with deployment. I will show 3 places to deploy, without any kind of integration. Some tools will come with a lot of integrations and that's great, because it save us a bunch of time, but let's work like we don't have any kind of integration at all, the same way we would do if we were doing it in our machines.
+
+It's important to note that integrations save us a lot of time, but make debugging a little trickier, as it will hide a lot of behaviours from us and could make it impossible to reproduce if we just change vendor.
+
+We will deploy our we app in Firebase, Heroku and Kubernetes cluster. On Firebase and Heroku, we will just use the most simple way of doing it, because.... remember, we're lazy and we have something else to do.
+
+#### Deploying to Firebase
+
+We wil deploy it to firebase, and it's pretty damn simple. Gitlab CI will pass on the cache with our build inside it, so we don't have to build it again. We then, use firebase tools to deploy it on firebase hosting.
+
+```yaml
+deploy_firebase:
+  stage: deploy
+  environment:
+    name: Firebase
+    url: https://daitan-k8s-bootcamp.firebaseapp.com
+  only:
+    - master
+  script:
+    - npm install -g firebase-tools
+    - firebase use --token $FIREBASE_TOKEN daitan-k8s-bootcamp
+    - firebase deploy -m "Pipeline $CI_PIPELINE_ID, build $CI_BUILD_ID" --non-interactive --token $FIREBASE_TOKEN
+	when: manual
+```
+
+Not so complicated. All the steps above are the same you would normally do in your machine in order to deploy it to firebase hosting. The same way we used our secrets to build our docker image, we will use it here to pass along our firebase token and some data. Simple and easy. NEXT!!!!!!!
+
+#### Deploying to Heroku
+
+Heroku makes it much more simple as it only needs a git push in order to deploy it (I'm talking about the minimun effort to do so). We just have to add a remote repository and push it.
+
+```yaml
+heroku-deploy:
+  stage: deploy
+  script:
+    - 'git remote add heroku https://$DOCKER_USERNAME:$HEROKU_TOKEN@git.heroku.com/daitan-k8s-bootcamp-web.git'
+    - 'git push -f heroku master'
+  environment:
+    name: Heroku
+    url: https://daitan-k8s-bootcamp-web.herokuapp.com/
+  only:
+    - master
+  when: manual
+```
+
+#### Deploying to Kubernetes
+
+```yaml
+deploy_gkc:
+  stage: deploy
+  image: google/cloud-sdk:alpine
+  environment:
+    name: Kubernetes
+  script:
+    - echo $GKC_TOKEN > credential_key.json
+    - gcloud auth activate-service-account --key-file=credential_key.json
+    - gcloud config set project daitan-k8s-bootcamp
+    - gcloud components install kubectl --quiet
+    - gcloud container clusters get-credentials daitank8sbootcamp --zone us-central1-a
+    - sed -i "s/paulushc\/k8s-bootcamp-web:v2/$DOCKER_USERNAME\/$CI_PROJECT_NAME:${CI_PIPELINE_ID}/g" cloud-company-deploy.yaml
+    - kubectl apply -f cloud-company-deploy.yaml
+  only:
+    - master
+	when: manual
+```
+
+```shell
+kubectl get svc web -ao jsonpath={..ip}
+```
 
 ## Something Missing
 
@@ -1242,3 +1406,5 @@ If you have ideas for more “How To” or fixes for some errors found in here, 
 
 - Sometimes, npm just don't work as expected. It can be due to some network issues, or path issues (is know that windows environments contains a limitation on the amount of characters used) so try to keep the project under a directory within a small path if you, like miself intent to use it on windows environment.
 - MongoDB could be a real pain to install in certain environments, so I recommend that you use [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/lp/general) as you can use it with a free instance or any other cloud provided mongodb instance, or you can use a [dockerized mongodb](https://hub.docker.com/_/mongo/).
+- Minikube don't have support to LoadBalancer (yet) so we have 2 different kubernetes deployment files, changing just this. Also minikube seems to have some problems with DNS, and didn't work sometimes.
+- We didn't have set any kind of DNS structure or something like this, due to the scope of this bootcamp. In a real production environment, you will have replicasets, dns and persistent disc.
