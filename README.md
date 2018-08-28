@@ -1,6 +1,6 @@
-# Daitan Group DevOps Tools Bootcamp
+# DevOps Tools Bootcamp
 
-This is the project used during Daitan Group DevOps Tool Bootcamp on DevWeek. With this project, we will dive into some of the tools and processes normally adopted by a DevOps team.
+This is the project used during DevOps Tool Bootcamp on DevWeek. With this project, we will dive into some of the tools and processes normally adopted by a DevOps team.
 
 Along with this project, you will find links to the presentations used during the Bootcamp to explain some of the concepts presented here.
 
@@ -10,7 +10,7 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 
 ## Table of Contents
 
-- [Daitan Group DevOps Tools Bootcamp](#daitan-group-devops-tools-bootcamp)
+- [DevOps Tools Bootcamp](#devops-tools-bootcamp)
 	- [Table of Contents](#table-of-contents)
 	- [Basic Project](#basic-project)
 		- [Tools](#tools)
@@ -95,7 +95,7 @@ If you have any previous knowledge of any of the given tool, it will help a lot 
 
 You will find all the releases unde the tag of the project. Those releases are intended to be used as a starting point for this project. You will receive a clean environment, containing just the application itself (both API and WEB) and you will be able to run them with the commands present at `package.json` file of both projects. You can use a `.env` file to set some of the variables of the API app. Every new release will be an incremental step to our goal of taking this application to the cloud. When required, we will point to the tag on the code that you can get to start at that point, and we expect you to finish that topic at the start of the next tag.
 
-A good starting point for you will be our [first tag](https://github.com/paulushcgcj/daitan-k8s-bootcamp/releases/tag/v1.0), so get it and start working on it.
+A good starting point for you will be our [first tag](https://github.com/paulushcgcj/devops-k8s-bootcamp/releases/tag/v1.0), so get it and start working on it.
 
 #### Running API Project
 
@@ -1253,7 +1253,7 @@ If you do, congrats, you achieved a higher level of maturity, deploying to produ
 
 ### Splitting the steps
 
-Now that we know the meaning of CI and CD, let's build it ourselves. I've splitted this project and got only the web app insode our lab folder and put it into [another git project on GitLab](https://gitlab.com/paulushc/daitan-k8s-bootcamp-web). Right now, you could be thinking why I didn't used GitHub + CircleCI, and the reason is just one, I can use gitlab with private repos for free, and it has a built in CI system, which is also free and private as well, so I can keep some of my projects aside from curious eyes, and keep working using everything I normally do, but you need to understand that those Ci systems are just ways to achieve this, they are not the only sollution. You could, if you want to, build your own, using webhooks and shell scripts, and that's fine. Don't fall into that trap that you could only be doing DevOps if you use `tool X` or `tool Y`, because DevOps is a set of things, not a set of tools. Ok, so let's split our process.
+Now that we know the meaning of CI and CD, let's build it ourselves. I've splitted this project and got only the web app insode our lab folder and put it into [another git project on GitLab](https://gitlab.com/paulushc/devops-k8s-bootcamp-web). Right now, you could be thinking why I didn't used GitHub + CircleCI, and the reason is just one, I can use gitlab with private repos for free, and it has a built in CI system, which is also free and private as well, so I can keep some of my projects aside from curious eyes, and keep working using everything I normally do, but you need to understand that those Ci systems are just ways to achieve this, they are not the only sollution. You could, if you want to, build your own, using webhooks and shell scripts, and that's fine. Don't fall into that trap that you could only be doing DevOps if you use `tool X` or `tool Y`, because DevOps is a set of things, not a set of tools. Ok, so let's split our process.
 
 Let' begin with the top of our CI file, create a file in your project root folder called `.gitlab-ci.yml` and add some things to it. I will not enter in details, you can find the documentation on [GitLab website](https://docs.gitlab.com/ee/ci/yaml/). Let's begin by adding some information that will be used during most of our jobs.
 
@@ -1343,12 +1343,12 @@ deploy_firebase:
   stage: deploy
   environment:
     name: Firebase
-    url: https://daitan-k8s-bootcamp.firebaseapp.com
+    url: https://devops-k8s-bootcamp.firebaseapp.com
   only:
     - master
   script:
     - npm install -g firebase-tools
-    - firebase use --token $FIREBASE_TOKEN daitan-k8s-bootcamp
+    - firebase use --token $FIREBASE_TOKEN devops-k8s-bootcamp
     - firebase deploy -m "Pipeline $CI_PIPELINE_ID, build $CI_BUILD_ID" --non-interactive --token $FIREBASE_TOKEN
 	when: manual
 ```
@@ -1363,11 +1363,11 @@ Heroku makes it much more simple as it only needs a git push in order to deploy 
 heroku-deploy:
   stage: deploy
   script:
-    - 'git remote add heroku https://$DOCKER_USERNAME:$HEROKU_TOKEN@git.heroku.com/daitan-k8s-bootcamp-web.git'
+    - 'git remote add heroku https://$DOCKER_USERNAME:$HEROKU_TOKEN@git.heroku.com/devops-k8s-bootcamp-web.git'
     - 'git push -f heroku master'
   environment:
     name: Heroku
-    url: https://daitan-k8s-bootcamp-web.herokuapp.com/
+    url: https://devops-k8s-bootcamp-web.herokuapp.com/
   only:
     - master
   when: manual
@@ -1384,9 +1384,9 @@ deploy_gkc:
   script:
     - echo $GKC_TOKEN > credential_key.json
     - gcloud auth activate-service-account --key-file=credential_key.json
-    - gcloud config set project daitan-k8s-bootcamp
+    - gcloud config set project devops-k8s-bootcamp
     - gcloud components install kubectl --quiet
-    - gcloud container clusters get-credentials daitank8sbootcamp --zone us-central1-a
+    - gcloud container clusters get-credentials devopsk8sbootcamp --zone us-central1-a
     - sed -i "s/paulushc\/k8s-bootcamp-web:v2/$DOCKER_USERNAME\/$CI_PROJECT_NAME:${CI_PIPELINE_ID}/g" cloud-company-deploy.yaml
     - kubectl apply -f cloud-company-deploy.yaml
   only:
@@ -1400,7 +1400,7 @@ kubectl get svc web -ao jsonpath={..ip}
 
 ## Something Missing
 
-If you have ideas for more “How To” or fixes for some errors found in here, [let us know](https://github.com/paulushcgcj/daitan-k8s-bootcamp/issues) or [contribute some!](https://github.com/paulushcgcj/daitan-k8s-bootcamp/edit/master/README.md)
+If you have ideas for more “How To” or fixes for some errors found in here, [let us know](https://github.com/paulushcgcj/devops-k8s-bootcamp/issues) or [contribute some!](https://github.com/paulushcgcj/devops-k8s-bootcamp/edit/master/README.md)
 
 ### Know issues
 
