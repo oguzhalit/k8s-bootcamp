@@ -1,4 +1,4 @@
-# DevOps Tools Bootcamp
+# Kubernetes Bootcamp
 
 This is the project used during DevOps Tool Bootcamp on DevWeek. With this project, we will dive into some of the tools and processes normally adopted by a DevOps team.
 
@@ -10,7 +10,7 @@ The Bootcamp will be composed of 3 major parts, we will take a simple applicatio
 
 ## Table of Contents
 
-- [DevOps Tools Bootcamp](#devops-tools-bootcamp)
+- [Kubernetes Bootcamp](#kubernetes-bootcamp)
 	- [Table of Contents](#table-of-contents)
 	- [Basic Project](#basic-project)
 		- [Tools](#tools)
